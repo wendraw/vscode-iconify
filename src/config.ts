@@ -3,6 +3,7 @@ import { ColorThemeKind, window, workspace } from 'vscode'
 import fs from 'fs-extra'
 import { computed, reactive, ref } from '@vue/reactivity'
 import type { IconifyJSON } from '@iconify/iconify'
+import { $fetch } from 'ohmyfetch'
 import { EXT_NAMESPACE } from './meta'
 import type { IconsetMeta } from './collections'
 import { collectionIds, collections } from './collections'
@@ -62,14 +63,14 @@ export async function LoadCustomCollections() {
       const list: string[] = []
       if (workspace?.workspaceFolders) {
         for (const folder of workspace.workspaceFolders)
-          list.push(resolve(folder.uri.fsPath, file))
+          list.push(file.startsWith('http') ? file : resolve(folder.uri.fsPath, file))
       }
       return list
     })),
   )
 
   const existingFiles = files.filter((file) => {
-    const exists = fs.existsSync(file)
+    const exists = fs.existsSync(file) || file.startsWith('http')
     if (!exists)
       Log.warning(`Custom collection file does not exist: ${file}`)
     return exists
@@ -80,7 +81,10 @@ export async function LoadCustomCollections() {
 
     await Promise.all(existingFiles.map(async (file) => {
       try {
-        result.push(await fs.readJSON(file))
+        if (file.startsWith('http'))
+          result.push(await $fetch(file))
+        else
+          result.push(await fs.readJSON(file))
       }
       catch {
         Log.error(`Error on loading custom collection: ${file}`)
